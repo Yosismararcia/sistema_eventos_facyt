@@ -194,5 +194,71 @@ def solicitar():
         
     return render_template('solicitar.html', espacios=espacios)
 
+#nueva modificacion para admin
+# --- RUTA: PANEL DE ADMINISTRACIÓN ---
+@app.route('/admin')
+def admin_panel():
+    # 1. Protección de Rol: Si no ha iniciado sesión o no es administrativo, denegar acceso
+    if 'usuario_id' not in session or session.get('usuario_role') != 'administrativo' and session.get('usuario_rol') != 'administrativo':
+        flash("Acceso denegado: Se requieren permisos administrativos.", "error")
+        return redirect(url_for('inicio'))
+
+    conexion = obtener_conexion()
+    solicitudes = []
+    try:
+        with conexion.cursor() as cursor:
+            # Traer los eventos que están pendientes de gestión (solicitado, en revisión)
+            cursor.execute("""
+                SELECT e.id, e.titulo, e.tipo_actividad, e.fecha, e.hora_inicio, e.hora_fin, e.estado, 
+                       esp.nombre AS espacio, u.nombre AS responsable
+                FROM eventos e
+                LEFT JOIN espacios esp ON e.espacio_id = esp.id
+                LEFT JOIN usuarios u ON e.responsable_id = u.id
+                WHERE e.estado IN ('solicitado', 'en revisión')
+                ORDER BY e.fecha ASC;
+            """)
+            solicitudes = cursor.fetchall()
+    except Exception as e:
+        print(f"Error al cargar solicitudes de administración: {e}")
+    finally:
+        conexion.close()
+
+    return render_template('admin.html', solicitudes=solicitudes)
+
+
+# --- RUTA: ACCIÓN DE MODERACIÓN (CAMBIAR ESTADO) ---
+@app.route('/admin/moderar/<int:evento_id>', methods=['POST'])
+def moderar_evento(evento_id):
+    # Protección de Rol
+    if 'usuario_id' not in session or session.get('usuario_rol') != 'administrativo':
+        flash("Acceso denegado.", "error")
+        return redirect(url_for('inicio'))
+
+    nuevo_estado = request.form.get('nuevo_estado')
+    
+    if not nuevo_estado:
+        flash("Por favor, seleccione un estado válido.", "error")
+        return redirect(url_for('admin_panel'))
+
+    conexion = obtener_conexion()
+    try:
+        with conexion.cursor() as cursor:
+            # Actualizamos el estado del evento seleccionado
+            cursor.execute("UPDATE eventos SET estado = %s WHERE id = %s;", (nuevo_estado, evento_id))
+        conexion.commit()
+        flash(f"¡El evento ha sido actualizado a '{nuevo_estado}' con éxito!", "success")
+    except pymysql.MySQLError as e:
+        # Si el administrador intenta cambiar a 'aprobado' o 'programado' y CHOCA con otro evento, el Trigger saltará aquí
+        if e.args[0] == 45000:
+            flash(f"No se pudo aprobar: {e.args[1]}", "error")
+        else:
+            flash(f"Error en la base de datos: {e}", "error")
+    except Exception as e:
+        flash(f"Error inesperado: {e}", "error")
+    finally:
+        conexion.close()
+
+    return redirect(url_for('admin_panel'))
+
 if __name__ == '__main__':
     app.run(debug=True)

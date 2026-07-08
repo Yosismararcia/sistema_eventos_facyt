@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}Panel de Administración - FaCyT{% endblock %}
+
+{% block content %}
+<h2>Panel de Control Administrativo ⚙️</h2>
+<p>Gestión, revisión y aprobación de solicitudes de espacios físicos para eventos.</p>
+
+<section>
+    <h3>Solicitudes Pendientes de Revisión</h3>
+    <figure>
+        <table>
+            <thead>
+                <tr>
+                    <th>Evento / Actividad</th>
+                    <th>Tipo</th>
+                    <th>Fecha y Horario</th>
+                    <th>Espacio Solicitado</th>
+                    <th>Responsable</th>
+                    <th>Acciones de Moderación</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if solicitudes %}
+                    {% for sol in solicitudes %}
+                    <tr>
+                        <td><strong>{{ sol.titulo }}</strong> <br> <small class="secondary">Estado actual: {{ sol.estado }}</small></td>
+                        <td>{{ sol.tipo_actividad }}</td>
+                        <td>{{ sol.fecha }} ({{ sol.hora_inicio }} - {{ sol.hora_fin }})</td>
+                        <td>{{ sol.espacio }}</td>
+                        <td>{{ sol.responsable }}</td>
+                        <td>
+                            <form action="/admin/moderar/{{ sol.id }}" method="POST" style="margin: 0; display: inline-flex; gap: 5px;">
+                                <select name="nuevo_estado" aria-label="Cambiar estado" required style="margin-bottom: 0; padding: 2px 5px; font-size: 0.85rem;">
+                                    <option value="" disabled selected>Cambiar a...</option>
+                                    <option value="aprobado">Aprobar</option>
+                                    <option value="programado">Programar</option>
+                                    <option value="en revisión">Poner en Revisión</option>
+                                    <option value="rechazado">Rechazar</option>
+                                    <option value="cancelado">Cancelar</option>
+                                </select>
+                                <button type="submit" class="primary" style="padding: 2px 10px; margin-bottom: 0; font-size: 0.85rem;">Actualizar</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; color: #888;">
+                            No hay solicitudes pendientes en este momento. ✨
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </figure>
+</section>
+{% endblock %}
