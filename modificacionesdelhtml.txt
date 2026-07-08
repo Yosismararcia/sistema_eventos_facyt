@@ -1,0 +1,265 @@
+{% extends 'base.html' %}
+
+    {% block title %}Inicio - Gestión de Eventos FaCyT{% endblock %}
+
+    {% block content %}
+    <div class="hero" style="padding: 2rem 0; text-align: center;">
+        <h1>Jornadas de Investigación y Congresos Científicos 🚀</h1>
+        <p>Plataforma centralizada para la divulgación del conocimiento y optimización de espacios de la facultad.</p>
+    </div>
+
+    <section>
+        <div class="grid">
+            <article style="text-align: center;">
+                <h5>Eventos Programados</h5>
+                <h2 style="color: var(--primary);">0</h2>
+            </article>
+            <article style="text-align: center;">
+                <h5>Solicitudes Pendientes</h5>
+                <h2 style="color: #d97706;">0</h2>
+            </article>
+            <article style="text-align: center;">
+                <h5>Espacios Registrados</h5>
+                <h2 style="color: #059669;">0</h2>
+            </article>
+        </div>
+    </section>
+
+    <section>
+        <h3>Próximos Eventos en la Facultad</h3>
+        <figure>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Evento</th>
+                        <th>Tipo</th>
+                        <th>Fecha y Hora</th>
+                        <th>Lugar</th>
+                        <th>Responsable</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: #888;">
+                            No hay eventos programados en este momento.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </figure>
+    </section>
+    {% endblock %}
+
+
+
+
+
+#primer código de la app.py
+"""
+from flask import Flask, render_template
+
+app = Flask(__name__)
+
+# Ruta principal: Cuando alguien entre a la app, verá el index.html
+@app.route('/')
+def home():
+    return render_template('index.html')
+
+if __name__ == '__main__':
+    # El modo debug permite ver cambios en tiempo real sin reiniciar el servidor
+    app.run(debug=True)
+
+"""
+#nuevas modificaciones para conectar con la base de datos de Aiven
+#segundo codigo de la app.py
+"""
+    import os
+    from flask import Flask, render_template
+    import pymysql
+    from dotenv import load_dotenv
+
+    # Cargar las variables de entorno del archivo .env
+    load_dotenv()
+
+    app = Flask(__name__)
+
+    def obtener_conexion():
+        return pymysql.connect(
+            host=os.getenv('DB_HOST'),
+            user=os.getenv('DB_USER'),
+            password=os.getenv('DB_PASSWORD'),
+            port=int(os.getenv('DB_PORT')),
+            database=os.getenv('DB_NAME'),
+            ssl_verify_identity=False, # Requerido por Aiven
+            cursorclass=pymysql.cursors.DictCursor # Nos devuelve los datos como diccionarios
+        )
+
+    @app.route('/')
+    def inicio():
+        conexion = obtener_conexion()
+        metrics = {
+            'programados': 0,
+            'pendientes': 0,
+            'espacios': 0
+        }
+        eventos = []
+        
+        try:
+            with conexion.cursor() as cursor:
+                # 1. Contar eventos aprobados o programados
+                cursor.execute("SELECT COUNT(*) AS total FROM eventos WHERE estado IN ('aprobado', 'programado');")
+                metrics['programados'] = cursor.fetchone()['total']
+                
+                # 2. Contar solicitudes pendientes (en estado solicitado o en revisión)
+                cursor.execute("SELECT COUNT(*) AS total FROM eventos WHERE estado IN ('solicitado', 'en revisión');")
+                metrics['pendientes'] = cursor.fetchone()['total']
+                
+                # 3. Contar total de espacios registrados
+                cursor.execute("SELECT COUNT(*) AS total FROM espacios;")
+                metrics['espacios'] = cursor.fetchone()['total']
+                
+                # 4. Consultar los próximos eventos (con el nombre del espacio físico y del responsable)
+                # Traeremos los últimos 5 ordenados por fecha
+                cursor.execute("""
+                    SELECT e.titulo, e.tipo_actividad, e.fecha, e.hora_inicio, e.hora_fin, esp.nombre AS espacio, u.nombre AS responsable
+                    FROM eventos e
+                    LEFT JOIN espacios esp ON e.espacio_id = esp.id
+                    LEFT JOIN usuarios u ON e.responsable_id = u.id
+                    WHERE e.estado IN ('aprobado', 'programado')
+                    ORDER BY e.fecha ASC
+                    LIMIT 5; 
+            """)
+                eventos = cursor.fetchall()
+                
+        except Exception as e:
+            print(f"Error al cargar el dashboard: {e}")
+        finally:
+            conexion.close()
+            
+        return render_template('index.html', metrics=metrics, eventos=eventos)
+
+    if __name__ == '__main__':
+        # Modo debug activo para que los cambios se refresquen solos en desarrollo
+        app.run(debug=True)
+
+
+"""
+
+
+
+# 2 nueva modificacion
+import os
+from flask import Flask, render_template, request, redirect, url_for, flash
+import pymysql
+from dotenv import load_dotenv
+
+load_dotenv()
+
+app = Flask(__name__)
+# Necesitamos una clave secreta para poder usar mensajes "flash" (alertas en pantalla)
+app.secret_key = 'clave_secreta_facyt_ev'
+
+def obtener_conexion():
+    return pymysql.connect(
+        host=os.getenv('DB_HOST'),
+        user=os.getenv('DB_USER'),
+        password=os.getenv('DB_PASSWORD'),
+        port=int(os.getenv('DB_PORT')),
+        database=os.getenv('DB_NAME'),
+        ssl_verify_identity=False,
+        cursorclass=pymysql.cursors.DictCursor
+    )
+
+@app.route('/')
+def inicio():
+    conexion = obtener_conexion()
+    metrics = {'programados': 0, 'pendientes': 0, 'espacios': 0}
+    eventos = []
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute("SELECT COUNT(*) AS total FROM eventos WHERE estado IN ('aprobado', 'programado');")
+            metrics['programados'] = cursor.fetchone()['total']
+            cursor.execute("SELECT COUNT(*) AS total FROM eventos WHERE estado IN ('solicitado', 'en revisión');")
+            metrics['pendientes'] = cursor.fetchone()['total']
+            cursor.execute("SELECT COUNT(*) AS total FROM espacios;")
+            metrics['espacios'] = cursor.fetchone()['total']
+            
+            cursor.execute("""
+                SELECT e.titulo, e.tipo_actividad, e.fecha, e.hora_inicio, e.hora_fin, esp.nombre AS espacio, u.nombre AS responsable
+                FROM eventos e
+                LEFT JOIN espacios esp ON e.espacio_id = esp.id
+                LEFT JOIN usuarios u ON e.responsable_id = u.id
+                WHERE e.estado IN ('aprobado', 'programado')
+                ORDER BY e.fecha ASC LIMIT 5;
+            """)
+            eventos = cursor.fetchall()
+    except Exception as e:
+        print(f"Error al cargar el dashboard: {e}")
+    finally:
+        conexion.close()
+    return render_template('index.html', metrics=metrics, eventos=eventos)
+
+
+@app.route('/solicitar', methods=['GET', 'POST'])
+def solicitar():
+    conexion = obtener_conexion()
+    
+    # Si el usuario llena el formulario y presiona enviar (POST)
+    if request.method == 'POST':
+        titulo = request.form.get('titulo')
+        tipo_actividad = request.form.get('tipo_actividad')
+        espacio_id = request.form.get('espacio_id')
+        fecha = request.form.get('fecha')
+        hora_inicio = request.form.get('hora_inicio')
+        hora_fin = request.form.get('hora_fin')
+        
+        # --- VALIDACIONES ANTES DE ENVIAR A LA BD ---
+        # 1. Validar campos vacíos
+        if not all([titulo, tipo_actividad, espacio_id, fecha, hora_inicio, hora_fin]):
+            flash("Error: Todos los campos son obligatorios.", "error")
+            return redirect(url_for('solicitar'))
+            
+        # 2. Validar consistencia horaria (Que no termine antes de empezar)
+        if hora_inicio >= hora_fin:
+            flash("Error lógico: La hora de inicio no puede ser mayor o igual a la hora de finalización.", "error")
+            return redirect(url_for('solicitar'))
+
+        try:
+            with conexion.cursor() as cursor:
+                # Insertaremos el evento asignado temporalmente al usuario ID 1 (Prof. Carlos)
+                # El estado queda por defecto en 'solicitado' según los requerimientos del flujo
+                cursor.execute("""
+                    INSERT INTO eventos (titulo, responsable_id, tipo_actividad, fecha, hora_inicio, hora_fin, estado, espacio_id)
+                    VALUES (%s, %s, %s, %s, %s, %s, 'solicitado', %s);
+                """, (titulo, 1, tipo_actividad, fecha, hora_inicio, hora_fin, espacio_id))
+                
+            conexion.commit()
+            flash("¡Solicitud registrada correctamente! Queda en espera de revisión administrativa.", "success")
+            return redirect(url_for('inicio'))
+            
+        except pymysql.MySQLError as e:
+            # Capturamos si nuestro Trigger de la Base de Datos rebota el evento por solapamiento
+            if e.args[0] == 45000:
+                flash(f"{e.args[1]}", "error")
+            else:
+                flash(f"Error inesperado en la base de datos: {e}", "error")
+        finally:
+            conexion.close()
+            
+        return redirect(url_for('solicitar'))
+
+    # Si el usuario solo entra a ver la página (GET), cargamos los espacios en el selector
+    espacios = []
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute("SELECT id, nombre, capacidad FROM espacios;")
+            espacios = cursor.fetchall()
+    except Exception as e:
+        print(f"Error al traer espacios: {e}")
+    finally:
+        conexion.close()
+        
+    return render_template('solicitar.html', espacios=espacios)
+
+if __name__ == '__main__':
+    app.run(debug=True) 

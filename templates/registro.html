@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+
+{% block title %}Registro de Usuario - FaCyT{% endblock %}
+
+{% block content %}
+<article style="max-width: 500px; margin: 0 auto;">
+    <header>
+        <h3 style="text-align: center;">Crear Cuenta 🏫</h3>
+    </header>
+    
+    <form action="/registro" method="POST">
+        <label for="nombre">Nombre Completo:</label>
+        <input type="text" id="nombre" name="nombre" placeholder="Ej. Ana Pérez" required>
+
+        <label for="correo">Correo Institucional / Personal:</label>
+        <input type="email" id="correo" name="correo" placeholder="ejemplo@uc.edu.ve" required>
+
+        <label for="rol">Tipo de Usuario (Rol):</label>
+        <select id="rol" name="rol" required>
+            <option value="" disabled selected>Selecciona tu rol...</option>
+            <option value="estudiante">Estudiante</option>
+            <option value="ponente">Ponente / Investigador</option>
+            <option value="administrativo">Personal Administrativo</option>
+        </select>
+
+        <label for="contrasena">Contraseña:</label>
+        <input type="password" id="contrasena" name="contrasena" placeholder="••••••••" required>
+
+        <input type="submit" value="Registrarse" class="primary">
+    </form>
+    
+    <footer style="text-align: center; margin-top: 1rem;">
+        <p>¿Ya tienes cuenta? <a href="/login">Inicia sesión aquí</a></p>
+    </footer>
+</article>
+{% endblock %}

@@ -1,12 +1,64 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Eventos FaCyT</title>
-</head>
-<body>
-    <h1>¡Servidor Flask Activo!</h1>
-    <p>Bienvenido al Sistema de Gestión de Eventos, Jornadas y Congresos Científicos.</p>
-</body>
-</html>
+
+    {% extends 'base.html' %}
+
+{% block title %}Inicio - Gestión de Eventos FaCyT{% endblock %}
+
+{% block content %}
+<div class="hero" style="padding: 2rem 0; text-align: center;">
+    <h1>Jornadas de Investigación y Congresos Científicos 🚀</h1>
+    <p>Plataforma centralizada para la divulgación del conocimiento y optimización de espacios de la facultad.</p>
+</div>
+
+<section>
+    <div class="grid">
+        <article style="text-align: center;">
+            <h5>Eventos Programados</h5>
+            <h2 style="color: var(--primary);">{{ metrics.programados }}</h2>
+        </article>
+        <article style="text-align: center;">
+            <h5>Solicitudes Pendientes</h5>
+            <h2 style="color: #d97706;">{{ metrics.pendientes }}</h2>
+        </article>
+        <article style="text-align: center;">
+            <h5>Espacios Registrados</h5>
+            <h2 style="color: #059669;">{{ metrics.espacios }}</h2>
+        </article>
+    </div>
+</section>
+
+<section>
+    <h3>Próximos Eventos en la Facultad</h3>
+    <figure>
+        <table>
+            <thead>
+                <tr>
+                    <th>Evento</th>
+                    <th>Tipo</th>
+                    <th>Fecha y Horario</th>
+                    <th>Lugar</th>
+                    <th>Responsable</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if eventos %}
+                    {% for evento in eventos %}
+                    <tr>
+                        <td><strong>{{ evento.titulo }}</strong></td>
+                        <td>{{ evento.tipo_actividad }}</td>
+                        <td>{{ evento.fecha }} ({{ evento.hora_inicio }} - {{ evento.hora_fin }})</td>
+                        <td>{{ evento.espacio if evento.espacio else 'No asignado' }}</td>
+                        <td>{{ evento.responsable if evento.responsable else 'Sin responsable' }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: #888;">
+                            No hay eventos programados en este momento.
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </figure>
+</section>
+{% endblock %}
