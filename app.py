@@ -260,5 +260,33 @@ def moderar_evento(evento_id):
 
     return redirect(url_for('admin_panel'))
 
+# --- RUTA: HISTORIAL DE SOLICITUDES DEL USUARIO LOGUEADO ---
+@app.route('/mis-solicitudes')
+def mis_solicitudes():
+    # Protección: Si no ha iniciado sesión, redirigir
+    if 'usuario_id' not in session:
+        flash("Por favor, inicia sesión para ver tus solicitudes.", "error")
+        return redirect(url_for('login'))
+
+    conexion = obtener_conexion()
+    solicitudes = []
+    try:
+        with conexion.cursor() as cursor:
+            # Buscamos solo los eventos creados por el ID en sesión
+            cursor.execute("""
+                SELECT e.titulo, e.tipo_actividad, e.fecha, e.hora_inicio, e.hora_fin, e.estado, esp.nombre AS espacio
+                FROM eventos e
+                LEFT JOIN espacios esp ON e.espacio_id = esp.id
+                WHERE e.responsable_id = %s
+                ORDER BY e.fecha DESC;
+            """, (session['usuario_id'],))
+            solicitudes = cursor.fetchall()
+    except Exception as e:
+        print(f"Error al cargar mis solicitudes: {e}")
+    finally:
+        conexion.close()
+
+    return render_template('mis_solicitudes.html', solicitudes=solicitudes)
+    
 if __name__ == '__main__':
     app.run(debug=True)
