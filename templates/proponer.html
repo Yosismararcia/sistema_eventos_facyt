@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block title %}Proponer Actividad - FaCyT{% endblock %}
+
+{% block content %}
+<article style="max-width: 600px; margin: 0 auto;">
+    <header>
+        <h2>Proponer Nueva Actividad Académica 💡</h2>
+        <p>Envía ideas de talleres, jornadas o congresos que te gustaría que se realizaran en la facultad. El profesorado o los administrativos evaluarán tu propuesta para formalizarla.</p>
+    </header>
+
+    <form action="/proponer" method="POST">
+        <label for="titulo">Idea / Título Sugerido del Evento:</label>
+        <input type="text" id="titulo" name="titulo" placeholder="Ej. Taller Práctico de Docker para Computación" required>
+
+        <label for="tipo_actividad">Tipo de Actividad:</label>
+        <select id="tipo_actividad" name="tipo_actividad" required>
+            <option value="Congreso">Congreso</option>
+            <option value="Jornada de Investigación">Jornada de Investigación</option>
+            <option value="Conferencia">Conferencia</option>
+            <option value="Taller">Taller</option>
+        </select>
+
+        <label for="descripcion">Justificación y Descripción:</label>
+        <textarea id="descripcion" name="descripcion" placeholder="Explica brevemente por qué es importante este evento y qué temáticas debería abordar." rows="4" required></textarea>
+
+        <button type="submit" class="primary">Enviar Propuesta</button>
+    </form>
+</article>
+{% endblock %}

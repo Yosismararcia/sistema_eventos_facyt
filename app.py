@@ -51,42 +51,46 @@ def inicio():
         conexion.close()
     return render_template('index.html', metrics=metrics, eventos=eventos)
 
-
-# --- RUTA: REGISTRO DE USUARIOS ---
+#Ruta para registro de  usuarios (modificado para validar cédula de ponentes y administrativos)
 @app.route('/registro', methods=['GET', 'POST'])
 def registro():
     if request.method == 'POST':
         nombre = request.form.get('nombre')
+        cedula = request.form.get('cedula').strip()
         correo = request.form.get('correo')
+        password = request.form.get('password')
         rol = request.form.get('rol')
-        contrasena = request.form.get('contrasena')
 
-        if not all([nombre, correo, rol, contrasena]):
-            flash("Error: Todos los campos son obligatorios.", "error")
-            return redirect(url_for('registro'))
+        # VALIDACIÓN INSTITUCIONAL DE CÉDULA
+        if rol in ['ponente', 'administrativo']:
+            conexion = obtener_conexion()
+            try:
+                with conexion.cursor() as cursor:
+                    # Buscamos si la cédula existe y corresponde al rol seleccionado
+                    cursor.execute("SELECT * FROM personal_autorizado WHERE cedula = %s AND rol_permitido = %s;", (cedula, rol))
+                    autorizado = cursor.fetchone()
+                    if not autorizado:
+                        flash(f"❌ Acceso Denegado: La cédula {cedula} no está registrada como personal autorizado para el rol de {rol}.", "error")
+                        return redirect(url_for('registro'))
+            finally:
+                conexion.close()
 
-        # Encriptar la contraseña usando el método pbkdf2:sha256 por defecto
-        contrasena_hash = generate_password_hash(contrasena)
-
+        # Si pasa la validación o es estudiante, se registra
+        password_hashed = generate_password_hash(password)
         conexion = obtener_conexion()
         try:
             with conexion.cursor() as cursor:
                 cursor.execute("""
-                    INSERT INTO usuarios (nombre, correo, contrasena_hash, rol)
-                    VALUES (%s, %s, %s, %s);
-                """, (nombre, correo, contrasena_hash, rol))
+                    INSERT INTO usuarios (nombre, cedula, correo, password, rol)
+                    VALUES (%s, %s, %s, %s, %s);
+                """, (nombre, cedula, correo, password_hashed, rol))
             conexion.commit()
-            flash("🎉 ¡Cuenta creada con éxito! Ahora puedes iniciar sesión.", "success")
+            flash("🎉 Cuenta creada con éxito. Ya puedes iniciar sesión.", "success")
             return redirect(url_for('login'))
-        except pymysql.err.IntegrityError:
-            # Captura si el correo electrónico ya existe (restricción UNIQUE de la BD)
-            flash("Error: El correo electrónico ya se encuentra registrado.", "error")
         except Exception as e:
-            flash(f"Error inesperado: {e}", "error")
+            flash("Error: La cédula o el correo ya se encuentran registrados en el sistema.", "error")
         finally:
             conexion.close()
-            
-        return redirect(url_for('registro'))
 
     return render_template('registro.html')
 
@@ -313,5 +317,41 @@ def mis_solicitudes():
 
     return render_template('mis_solicitudes.html', solicitudes=solicitudes)
     
+# ---- RUTA PARA PROPUESTAS DE ESTUDIANTES
+@app.route('/proponer', methods=['GET', 'POST'])
+def proponer_evento():
+    if 'usuario_id' not in session or session.get('usuario_rol') != 'estudiante':
+        flash("Esta sección es exclusiva para que los estudiantes propongan ideas.", "error")
+        return redirect(url_for('inicio'))
+
+    if request.method == 'POST':
+        titulo = request.form.get('titulo')
+        tipo_actividad = request.form.get('tipo_actividad')
+        descripcion = request.form.get('descripcion')
+
+        conexion = obtener_conexion()
+        try:
+            with conexion.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO propuestas_estudiantes (estudiante_id, titulo, tipo_actividad, descripcion)
+                    VALUES (%s, %s, %s, %s);
+                """, (session['usuario_id'], titulo, tipo_actividad, descripcion))
+            conexion.commit()
+            flash("💡 ¡Tu propuesta ha sido enviada con éxito al profesorado! Gracias por contribuir.", "success")
+            return redirect(url_for('inicio'))
+        except Exception as e:
+            flash(f"Hubo un error al procesar tu propuesta: {e}", "error")
+        finally:
+            conexion.close()
+
+    return render_template('proponer.html')
+
+#
+
+
+
+
+
+
 if __name__ == '__main__':
     app.run(debug=True)

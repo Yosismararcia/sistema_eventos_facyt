@@ -293,3 +293,102 @@ def admin_panel():
 
    # return render_template('admin.html', solicitudes=solicitudes)
 """
+
+
+modificado por lo de las cedulas  
+{% extends 'base.html' %}
+
+{% block title %}Registro de Usuario - FaCyT{% endblock %}
+
+{% block content %}
+<article style="max-width: 500px; margin: 0 auto;">
+    <header>
+        <h3 style="text-align: center;">Crear Cuenta 🏫</h3>
+    </header>
+    
+    <form action="/registro" method="POST">
+        <label for="nombre">Nombre Completo:</label>
+        <input type="text" id="nombre" name="nombre" placeholder="Ej. Ana Pérez" required>
+
+        <label for="correo">Correo Institucional / Personal:</label>
+        <input type="email" id="correo" name="correo" placeholder="ejemplo@uc.edu.ve" required>
+
+        <label for="rol">Tipo de Usuario (Rol):</label>
+        <select id="rol" name="rol" required>
+            <option value="" disabled selected>Selecciona tu rol...</option>
+            <option value="estudiante">Estudiante</option>
+            <option value="ponente">Ponente / Investigador</option>
+            <option value="administrativo">Personal Administrativo</option>
+        </select>
+
+        <label for="contrasena">Contraseña:</label>
+        <input type="password" id="contrasena" name="contrasena" placeholder="••••••••" required>
+
+        <input type="submit" value="Registrarse" class="primary">
+    </form>
+    
+    <footer style="text-align: center; margin-top: 1rem;">
+        <p>¿Ya tienes cuenta? <a href="/login">Inicia sesión aquí</a></p>
+    </footer>
+</article>
+{% endblock %}
+
+
+# --- RUTA: REGISTRO DE USUARIOS ---
+@app.route('/registro', methods=['GET', 'POST'])
+def registro():
+    if request.method == 'POST':
+        nombre = request.form.get('nombre')
+        correo = request.form.get('correo')
+        rol = request.form.get('rol')
+        contrasena = request.form.get('contrasena')
+
+        if not all([nombre, correo, rol, contrasena]):
+            flash("Error: Todos los campos son obligatorios.", "error")
+            return redirect(url_for('registro'))
+
+        # Encriptar la contraseña usando el método pbkdf2:sha256 por defecto
+        contrasena_hash = generate_password_hash(contrasena)
+
+        conexion = obtener_conexion()
+        try:
+            with conexion.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO usuarios (nombre, correo, contrasena_hash, rol)
+                    VALUES (%s, %s, %s, %s);
+                """, (nombre, correo, contrasena_hash, rol))
+            conexion.commit()
+            flash("🎉 ¡Cuenta creada con éxito! Ahora puedes iniciar sesión.", "success")
+            return redirect(url_for('login'))
+        except pymysql.err.IntegrityError:
+            # Captura si el correo electrónico ya existe (restricción UNIQUE de la BD)
+            flash("Error: El correo electrónico ya se encuentra registrado.", "error")
+        except Exception as e:
+            flash(f"Error inesperado: {e}", "error")
+        finally:
+            conexion.close()
+            
+        return redirect(url_for('registro'))
+
+    return render_template('registro.html')
+
+
+
+    # NUEVA MODIFICACION DE USUARIOS LOG 
+    <ul>
+            <li><a href="/">Inicio</a></li>
+            <!-- Si el usuario ha iniciado sesión -->
+            {% if session.get('usuario_id') %}
+                <!-- Si es administrador, le mostramos el botón del panel -->
+                {% if session.get('usuario_rol') == 'administrativo' %}
+                    <li><a href="/admin" style="background-color: #e5e7eb; color: #1f2937; padding: 5px 10px; border-radius: 4px;">🛠️ Panel Admin</a></li>
+                {% endif %}
+                <li><a href="/solicitar">Solicitar Evento</a></li>
+                <li><a href="/mis-solicitudes">Mis Solicitudes</a></li>
+                <li><span style="color: var(--primary);">👤 {{ session.get('usuario_nombre') }}</span></li>
+                <li><a href="/logout" class="secondary">Cerrar Sesión</a></li>
+            <!-- Si no ha iniciado sesión -->
+            {% else %}
+                <li><a href="/login" class="secondary">Iniciar Sesión</a></li>
+            {% endif %}
+        </ul>
