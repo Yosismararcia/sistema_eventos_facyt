@@ -392,3 +392,87 @@ def registro():
                 <li><a href="/login" class="secondary">Iniciar Sesión</a></li>
             {% endif %}
         </ul>
+
+
+
+
+................. base.html segun rompio el sistema por falta de una lineas de codigo 
+        <!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Gestión de Eventos FaCyT{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <style>
+        /* Colores coherentes con un entorno institucional y limpio */
+        :root {
+            --primary: #0056b3;
+        }
+        nav {
+            margin-bottom: 2rem;
+            border-bottom: 1px solid #e1e4e6;
+            padding: 0 1rem;
+        }
+        footer {
+            margin-top: 3rem;
+            text-align: center;
+            font-size: 0.9rem;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <nav class="container-fluid">
+        <ul>
+            <li><strong>FaCyT Eventos</strong></li>
+        </ul>
+         <ul>
+            <li><a href="/">Inicio</a></li>
+            {% if session.get('usuario_id') %}
+                
+                {% if session.get('usuario_rol') == 'administrativo' %}
+                    <li><a href="/admin" style="background-color: #e5e7eb; color: #1f2937; padding: 5px 10px; border-radius: 4px;">🛠️ Panel Admin</a></li>
+                    <li><a href="/admin/espacios" style="background-color: #e5e7eb; color: #1f2937; padding: 5px 10px; border-radius: 4px;">🏢 Espacios</a></li>
+                    <li><a href="/admin/crear-evento" style="background-color: #0056b3; color: white; padding: 5px 10px; border-radius: 4px;">➕ Registrar Evento</a></li>
+                {% endif %}
+                
+                {% if session.get('usuario_rol') == 'ponente' %}
+                    <li><a href="/solicitar" style="background-color: #2b6cb0; color: white; padding: 5px 10px; border-radius: 4px;">📝 Solicitar Espacio</a></li>
+                {% endif %}
+                
+                {% if session.get('usuario_rol') == 'estudiante' %}
+                    <li><a href="/proponer" style="background-color: #2f855a; color: white; padding: 5px 10px; border-radius: 4px;">💡 Proponer Idea</a></li>
+                 font-radius: 4px;">💡 Proponer Evento</a></li>
+                {% endif %}
+                
+                <li><a href="/mis-solicitudes">Mis Solicitudes</a></li>
+                <li><span style="color: var(--primary);">👤 {{ session.get('usuario_nombre') }} ({{ session.get('usuario_rol') | upper }})</span></li>
+                <li><a href="/logout" class="secondary">Cerrar Sesión</a></li>
+            {% else %}
+                <li><a href="/login" class="secondary">Iniciar Sesión</a></li>
+            {% endif %}
+         </ul>
+    </nav>
+    
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="alert" style="padding: 1rem; margin-bottom: 1.5rem; border-radius: 5px; background-color: {{ '#f8d7da' if category == 'error' else '#d1e7dd' }}; color: {{ '#842029' if category == 'error' else '#0f5132' }};">
+                {{ message }}
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <footer>
+        <p>© 2026 Facultad Experimental de Ciencias y Tecnología (FaCyT - UC)</p>
+    </footer>
+
+</body>
+</html>
