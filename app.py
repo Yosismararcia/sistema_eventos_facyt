@@ -195,22 +195,25 @@ def solicitar():
     return render_template('solicitar.html', espacios=espacios)
 
 #nueva modificacion para admin
-# --- RUTA: PANEL DE ADMINISTRACIÓN ---
+# --- RUTA: PANEL ADMINISTRATIVO CON ESTADÍSTICAS ---
 @app.route('/admin')
-def admin_panel():
-    # 1. Protección de Rol: Si no ha iniciado sesión o no es administrativo, denegar acceso
-    if 'usuario_id' not in session or session.get('usuario_role') != 'administrativo' and session.get('usuario_rol') != 'administrativo':
-        flash("Acceso denegado: Se requieren permisos administrativos.", "error")
-        return redirect(url_for('inicio'))
+def admin():
+    # Protección de rol
+    if 'usuario_id' not in session or session.get('usuario_rol') != 'administrativo':
+        flash("Acceso denegado. Se requieren permisos de administrador.", "error")
+        return redirect(url_for('index'))
 
     conexion = obtener_conexion()
     solicitudes = []
+    top_espacios = []
+    conteo_estados = []
+
     try:
         with conexion.cursor() as cursor:
-            # Traer los eventos que están pendientes de gestión (solicitado, en revisión)
+            # 1. Tu consulta original de solicitudes pendientes o en revisión
             cursor.execute("""
                 SELECT e.id, e.titulo, e.tipo_actividad, e.fecha, e.hora_inicio, e.hora_fin, e.estado, 
-                       esp.nombre AS espacio, u.nombre AS responsable
+                       esp.nombre AS espacio, u.nombre AS solicitado_por
                 FROM eventos e
                 LEFT JOIN espacios esp ON e.espacio_id = esp.id
                 LEFT JOIN usuarios u ON e.responsable_id = u.id
@@ -218,13 +221,35 @@ def admin_panel():
                 ORDER BY e.fecha ASC;
             """)
             solicitudes = cursor.fetchall()
+
+            # 2. NUEVA CONSULTA: Top espacios más solicitados (Estadística 1)
+            cursor.execute("""
+                SELECT esp.nombre, COUNT(e.id) as total 
+                FROM eventos e
+                JOIN espacios esp ON e.espacio_id = esp.id
+                GROUP BY esp.nombre
+                ORDER BY total DESC
+                LIMIT 5;
+            """)
+            top_espacios = cursor.fetchall()
+
+            # 3. NUEVA CONSULTA: Cantidad de eventos por estado (Estadística 2)
+            cursor.execute("""
+                SELECT estado, COUNT(*) as total 
+                FROM eventos 
+                GROUP BY estado;
+            """)
+            conteo_estados = cursor.fetchall()
+
     except Exception as e:
-        print(f"Error al cargar solicitudes de administración: {e}")
+        print(f"Error en panel administrativo: {e}")
     finally:
         conexion.close()
 
-    return render_template('admin.html', solicitudes=solicitudes)
-
+    return render_template('admin.html', 
+                           solicitudes=solicitudes, 
+                           top_espacios=top_espacios, 
+                           conteo_estados=conteo_estados)
 
 # --- RUTA: ACCIÓN DE MODERACIÓN (CAMBIAR ESTADO) ---
 @app.route('/admin/moderar/<int:evento_id>', methods=['POST'])
