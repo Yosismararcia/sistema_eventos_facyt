@@ -201,32 +201,43 @@ def solicitar():
 #nueva modificacion para admin
 # --- RUTA: PANEL ADMINISTRATIVO CON ESTADÍSTICAS ---
 @app.route('/admin')
+# --- RUTA: PANEL ADMINISTRATIVO CON ESTADÍSTICAS Y PROPUESTAS ---
+@app.route('/admin')
 def admin():
-    # Protección de rol
+    # Protección estricta de rol: Solo entra el administrativo
     if 'usuario_id' not in session or session.get('usuario_rol') != 'administrativo':
         flash("Acceso denegado. Se requieren permisos de administrador.", "error")
-        return redirect(url_for('index'))
+        return redirect(url_for('inicio'))
 
     conexion = obtener_conexion()
     solicitudes = []
+    propuestas = [] # <- Nueva lista para las ideas de los alumnos
     top_espacios = []
     conteo_estados = []
 
     try:
         with conexion.cursor() as cursor:
-            # 1. Tu consulta original de solicitudes pendientes o en revisión
+            # 1. Consulta de solicitudes formales (hechas por profesores/ponentes)
             cursor.execute("""
                 SELECT e.id, e.titulo, e.tipo_actividad, e.fecha, e.hora_inicio, e.hora_fin, e.estado, 
                        esp.nombre AS espacio, u.nombre AS solicitado_por
                 FROM eventos e
                 LEFT JOIN espacios esp ON e.espacio_id = esp.id
                 LEFT JOIN usuarios u ON e.responsable_id = u.id
-                WHERE e.estado IN ('solicitado', 'en revisión')
                 ORDER BY e.fecha ASC;
             """)
             solicitudes = cursor.fetchall()
 
-            # 2. NUEVA CONSULTA: Top espacios más solicitados (Estadística 1)
+            # 2. NUEVA CONSULTA: Traer las propuestas enviadas por los estudiantes
+            cursor.execute("""
+                SELECT p.id, p.titulo, p.tipo_actividad, p.descripcion, u.nombre AS estudiante
+                FROM propuestas_estudiantes p
+                JOIN usuarios u ON p.estudiante_id = u.id
+                ORDER BY p.id DESC;
+            """)
+            propuestas = cursor.fetchall()
+
+            # 3. Estadística 1: Top espacios más solicitados
             cursor.execute("""
                 SELECT esp.nombre, COUNT(e.id) as total 
                 FROM eventos e
@@ -237,7 +248,7 @@ def admin():
             """)
             top_espacios = cursor.fetchall()
 
-            # 3. NUEVA CONSULTA: Cantidad de eventos por estado (Estadística 2)
+            # 4. Estadística 2: Cantidad de eventos por estado
             cursor.execute("""
                 SELECT estado, COUNT(*) as total 
                 FROM eventos 
@@ -250,44 +261,66 @@ def admin():
     finally:
         conexion.close()
 
+    # Enviamos de forma explícita 'propuestas' al HTML
     return render_template('admin.html', 
                            solicitudes=solicitudes, 
+                           propuestas=propuestas, 
                            top_espacios=top_espacios, 
                            conteo_estados=conteo_estados)
 
-# --- RUTA: ACCIÓN DE MODERACIÓN (CAMBIAR ESTADO) ---
-@app.route('/admin/moderar/<int:evento_id>', methods=['POST'])
-def moderar_evento(evento_id):
-    # Protección de Rol
+# --- modificacion de el estado de las solicitudes por el admin ---
+@app.route('/admin/actualizar-estado/<int:evento_id>', methods=['POST'])
+def admin_actualizar_estado(evento_id):
+    # 1. Protección de seguridad: Verificar que sea un usuario administrativo
     if 'usuario_id' not in session or session.get('usuario_rol') != 'administrativo':
-        flash("Acceso denegado.", "error")
+        flash("Acceso denegado. Se requieren permisos de administrador.", "error")
         return redirect(url_for('inicio'))
 
-    nuevo_estado = request.form.get('nuevo_estado')
+    # 2. Capturar el estado seleccionado por el administrador en el menú desplegable
+    nuevo_estado = request.form.get('estado')
     
-    if not nuevo_estado:
-        flash("Por favor, seleccione un estado válido.", "error")
-        return redirect(url_for('admin_panel'))
-
     conexion = obtener_conexion()
     try:
         with conexion.cursor() as cursor:
-            # Actualizamos el estado del evento seleccionado
+            # Consultamos primero los datos del evento para saber el título y quién es el solicitante
+            cursor.execute("""
+                SELECT e.titulo, u.nombre AS solicitante 
+                FROM eventos e
+                LEFT JOIN usuarios u ON e.responsable_id = u.id
+                WHERE e.id = %s;
+            """, (evento_id,))
+            datos_evento = cursor.fetchone()
+            
+            if datos_evento:
+                titulo_evento = datos_evento['titulo']
+                nombre_solicitante = datos_evento['solicitante'] if datos_evento['solicitante'] else "el ponente asignado"
+            else:
+                titulo_evento = f"Evento #{evento_id}"
+                nombre_solicitante = "el solicitante"
+
+            # 3. Ejecutar la actualización en la base de datos
             cursor.execute("UPDATE eventos SET estado = %s WHERE id = %s;", (nuevo_estado, evento_id))
+        
+        # Guardar cambios permanentemente
         conexion.commit()
-        flash(f"¡El evento ha sido actualizado a '{nuevo_estado}' con éxito!", "success")
+        
+        # 4. Mensaje de éxito que indica explícitamente a quién afectó el cambio de estado
+        flash(f"📢 Control de Estado: El evento '{titulo_evento}' ha sido actualizado a '{nuevo_estado.upper()}'. "
+              f"Se ha modificado el estado formal en el historial de {nombre_solicitante}.", "success")
+
     except pymysql.MySQLError as e:
-        # Si el administrador intenta cambiar a 'aprobado' o 'programado' y CHOCA con otro evento, el Trigger saltará aquí
+        # Si pasa a 'aprobado' o 'programado' y CHOCA en horario/salón, el Trigger de la FaCyT salta aquí:
         if e.args[0] == 45000:
-            flash(f"No se pudo aprobar: {e.args[1]}", "error")
+            flash(f"❌ Error de Validación: {e.args[1]}", "error")
         else:
-            flash(f"Error en la base de datos: {e}", "error")
+            flash(f"❌ Error en la base de datos al guardar: {e}", "error")
     except Exception as e:
-        flash(f"Error inesperado: {e}", "error")
+        flash(f"❌ Error inesperado: {e}", "error")
     finally:
         conexion.close()
 
-    return redirect(url_for('admin_panel'))
+    # Redirigir de vuelta al panel administrativo para mostrar la alerta
+    return redirect(url_for('admin'))
 
 # --- RUTA: HISTORIAL DE SOLICITUDES DEL USUARIO LOGUEADO ---
 @app.route('/mis-solicitudes')
@@ -346,7 +379,67 @@ def proponer_evento():
 
     return render_template('proponer.html')
 
-#
+## --- RUTA: ELIMINAR EVENTO (SOLO ADMIN) ---
+@app.route('/admin/eliminar-evento/<int:evento_id>', methods=['POST'])
+def admin_eliminar_evento(evento_id):
+    if 'usuario_id' not in session or session.get('usuario_rol') != 'administrativo':
+        flash("Acceso denegado.", "error")
+        return redirect(url_for('inicio'))
+
+    conexion = obtener_conexion()
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute("DELETE FROM eventos WHERE id = %s;", (evento_id,))
+        conexion.commit()
+        flash("🗑️ El evento ha sido eliminado permanentemente del sistema.", "success")
+    except Exception as e:
+        flash(f"Error al eliminar el evento: {e}", "error")
+    finally:
+        conexion.close()
+        
+    return redirect(url_for('admin'))
+
+# --- RUTA: EDITAR EVENTO (FORMULARIO Y PROCESAMIENTO) ---
+@app.route('/admin/editar-evento/<int:evento_id>', methods=['GET', 'POST'])
+def admin_editar_evento(evento_id):
+    if 'usuario_id' not in session or session.get('usuario_rol') != 'administrativo':
+        flash("Acceso denegado.", "error")
+        return redirect(url_for('inicio'))
+
+    conexion = obtener_conexion()
+    if request.method == 'POST':
+        nuevo_titulo = request.form.get('titulo')
+        nuevo_tipo = request.form.get('tipo_actividad')
+        
+        try:
+            with conexion.cursor() as cursor:
+                cursor.execute("""
+                    UPDATE eventos 
+                    SET titulo = %s, tipo_actividad = %s 
+                    WHERE id = %s;
+                """, (nuevo_titulo, nuevo_tipo, evento_id))
+            conexion.commit()
+            flash("✏️ El evento ha sido modificado con éxito.", "success")
+            return redirect(url_for('admin'))
+        except Exception as e:
+            flash(f"Error al actualizar datos: {e}", "error")
+        finally:
+            conexion.close()
+
+    # Método GET: Buscar los datos actuales para mostrarlos en el formulario
+    evento = None
+    try:
+        with conexion.cursor() as cursor:
+            cursor.execute("SELECT id, titulo, tipo_actividad FROM eventos WHERE id = %s;", (evento_id,))
+            evento = cursor.fetchone()
+    finally:
+        conexion.close()
+
+    if not evento:
+        flash("El evento no existe.", "error")
+        return redirect(url_for('admin'))
+
+    return render_template('editar_evento.html', evento=evento)
 
 
 

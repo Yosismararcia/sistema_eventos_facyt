@@ -26,19 +26,22 @@
                     <li><a href="/admin" style="background-color: #e5e7eb; color: #1f2937; padding: 5px 10px; border-radius: 4px;">🛠️ Panel Admin</a></li>
                     <li><a href="/admin/espacios" style="background-color: #e5e7eb; color: #1f2937; padding: 5px 10px; border-radius: 4px;">🏢 Espacios</a></li>
                     <li><a href="/admin/crear-evento" style="background-color: #0056b3; color: white; padding: 5px 10px; border-radius: 4px;">➕ Registrar Evento</a></li>
+                    <li><a href="/mis-solicitudes">Historial Solicitudes</a></li>
                 {% endif %}
                 
                 {% if session.get('usuario_rol') == 'ponente' or session.get('usuario_role') == 'ponente' %}
                     <li><a href="/solicitar" style="background-color: #2b6cb0; color: white; padding: 5px 10px; border-radius: 4px;">📝 Solicitar Espacio</a></li>
+                    <li><a href="/mis-solicitudes">Mis Solicitudes</a></li>
                 {% endif %}
                 
                 {% if session.get('usuario_rol') == 'estudiante' or session.get('usuario_role') == 'estudiante' %}
                     <li><a href="/proponer" style="background-color: #2f855a; color: white; padding: 5px 10px; border-radius: 4px;">💡 Proponer Evento</a></li>
+                    <li><a href="/mis-propuestas">Mis Propuestas</a></li>
                 {% endif %}
                 
-                <li><a href="/mis-solicitudes">Mis Solicitudes</a></li>
                 <li><span style="color: var(--primary);">👤 {{ session.get('usuario_nombre') }}</span></li>
                 <li><a href="/logout" class="secondary">Cerrar Sesión</a></li>
+                {# por si no hay nadie logueado #}
             {% else %}
                 <li><a href="/login" class="secondary">Iniciar Sesión</a></li>
             {% endif %}

@@ -45,6 +45,14 @@ def registrar_datos_prueba():
             """)
             print("✔ Evento de prueba registrado con éxito.")
             
+            # 1. Crear tabla de nómina/personal autorizado por cédula
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS personal_autorizado (
+                cedula VARCHAR(20) PRIMARY KEY,
+                nombre_completo VARCHAR(100) NOT NULL,
+                rol_permitido VARCHAR(30) NOT NULL
+            );
+        """)
         conexion.commit()
         print("🎉 ¡Todos los datos de prueba han sido inyectados con éxito en Aiven!")
     except Exception as e:

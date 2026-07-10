@@ -25,8 +25,8 @@ try:
         """)
         
         # Insertamos profesores y admin de prueba con cédulas ficticias (puedes cambiarlas)
-        cursor.execute("INSERT IGNORE INTO personal_autorizado VALUES ('V-12345678', 'Prof. Alberto Mendoza', 'ponente');")
-        cursor.execute("INSERT IGNORE INTO personal_autorizado VALUES ('V-87654321', 'Ing. María Alejandra', 'administrativo');")
+        cursor.execute("INSERT IGNORE INTO personal_autorizado VALUES ('V-27894120', 'Admin. yosismar arcia', 'administrativo');")
+        cursor.execute("INSERT IGNORE INTO personal_autorizado VALUES ('V-12345678', 'Ing. María Alejandra', 'ponente');")
 
         # 2. Modificar la tabla de usuarios para incluir la cédula
         cursor.execute("ALTER TABLE usuarios ADD COLUMN cedula VARCHAR(20) UNIQUE AFTER nombre;")

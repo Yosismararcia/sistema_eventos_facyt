@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+
+{% block title %}Editar Evento - FaCyT{% endblock %}
+
+{% block content %}
+<h2>✏️ Modificar Evento Oficial</h2>
+<p>Edite los aspectos informativos básicos del evento seleccionado.</p>
+
+<article style="max-width: 600px; margin: 0 auto;">
+    <form method="POST">
+        <label for="titulo">Título de la Actividad / Congreso:</label>
+        <input type="text" id="titulo" name="titulo" value="{{ evento.titulo }}" required>
+
+        <label for="tipo_actividad">Tipo de Actividad:</label>
+        <select id="tipo_actividad" name="tipo_actividad" required>
+            <option value="Congreso" {% if evento.tipo_actividad == 'Congreso' %}selected{% endif %}>Congreso</option>
+            <option value="Jornada" {% if evento.tipo_actividad == 'Jornada' %}selected{% endif %}>Jornada</option>
+            <option value="Taller" {% if evento.tipo_actividad == 'Taller' %}selected{% endif %}>Taller</option>
+            <option value="Conferencia" {% if evento.tipo_actividad == 'Conferencia' %}selected{% endif %}>Conferencia</option>
+        </select>
+
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button type="submit" style="background-color: #198754; border-color: #198754;">Actualizar Cambios</button>
+            <a href="/admin" class="button secondary">Cancelar</a>
+        </div>
+    </form>
+</article>
+{% endblock %}
